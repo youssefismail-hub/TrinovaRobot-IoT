@@ -11,6 +11,8 @@ void setup() {
 }
 
 void loop() {
+    robot.update(); // vérifie le timeout de commande à chaque cycle
+
     robot.forward(40);
     delay(800);
 

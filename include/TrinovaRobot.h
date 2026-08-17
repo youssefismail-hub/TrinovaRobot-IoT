@@ -2,6 +2,8 @@
 #include <memory>
 #include "RobotTypes.h"
 #include "IRobotDriver.h"
+#include "MotionSafety.h"
+#include "RobotStateMachine.h"
 
 class TrinovaRobot {
 public:
@@ -19,16 +21,16 @@ public:
     void emergencyStop();
     bool clearEmergencyStop();
 
-    RobotState   state() const     { return _state; }
+    RobotState   state() const     { return _stateMachine.current(); }
     TrinovaError lastError() const { return _lastError; }
 
 private:
-    uint8_t clampSpeed(uint8_t speed) const;
     void applyWheelCommand(WheelCommand cmd, uint8_t speed);
 
     std::unique_ptr<IRobotDriver> _driver;
-    RobotConfig  _config;
-    RobotState   _state      = RobotState::Idle;
-    TrinovaError _lastError  = TrinovaError::NotInitialized;
-    bool         _initialized = false;
+    RobotConfig       _config;
+    MotionSafety      _safety{_config};
+    RobotStateMachine _stateMachine;
+    TrinovaError      _lastError   = TrinovaError::NotInitialized;
+    bool              _initialized = false;
 };
