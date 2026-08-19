@@ -6,7 +6,7 @@ TrinovaRobot robot;
 void setup() {
     Serial.begin(115200);
     delay(1000);
-    bool ok = robot.begin(RobotMode::Mock);
+    bool ok = robot.begin(RobotMode::Hardware);
     Serial.printf("[Setup] begin() = %s\n", ok ? "OK" : "FAIL");
 }
 
