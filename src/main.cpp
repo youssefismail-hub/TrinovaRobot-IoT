@@ -3,30 +3,31 @@
 #include "WatchdogService.h"
 #include "BatteryMonitor.h"
 #include "DiagnosticsService.h"
+#include "DeviceIdentity.h"
+#include "WiFiManager.h"
+#include "MqttClient.h"
+#include "IoTConfig.h"
 #include "Logger.h"
 
-// --- Config batterie (A AJUSTER selon ton pont diviseur réel) ---
 constexpr uint8_t  BATTERY_ADC_PIN     = 1;
-constexpr float    BATTERY_DIVIDER     = 2.0f;   // ex: pont 1:1 -> facteur 2 pour retrouver la tension réelle
+constexpr float    BATTERY_DIVIDER     = 2.0f;
 constexpr float    BATTERY_LOW_V       = 6.6f;
 constexpr float    BATTERY_CRITICAL_V  = 6.0f;
-
 constexpr uint32_t WATCHDOG_TIMEOUT_S  = 5;
 
 TrinovaRobot   robot;
 BatteryMonitor battery(BATTERY_ADC_PIN, BATTERY_DIVIDER, BATTERY_LOW_V, BATTERY_CRITICAL_V);
+WiFiManager    wifiManager(IoTConfig::WIFI_SSID, IoTConfig::WIFI_PASSWORD);
+MqttClient*    mqttClient = nullptr;
 
-// Mutex protégeant l'accès concurrent à `robot` depuis plusieurs tâches.
 SemaphoreHandle_t g_robotMutex;
+String g_statusTopic;
 
-// --- MotionTask : exécute le cycle de mouvement + update() (timeout) ---
 void motionTaskFn(void* /*pvParameters*/) {
     WatchdogService::registerCurrentTask();
-
     for (;;) {
         if (xSemaphoreTake(g_robotMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
-            robot.update(); // vérifie le timeout de commande (MotionSafety)
-
+            robot.update();
             robot.forward(40);
             xSemaphoreGive(g_robotMutex);
             vTaskDelay(pdMS_TO_TICKS(800));
@@ -41,15 +42,12 @@ void motionTaskFn(void* /*pvParameters*/) {
             xSemaphoreGive(g_robotMutex);
             vTaskDelay(pdMS_TO_TICKS(1500));
         }
-
         WatchdogService::feed();
     }
 }
 
-// --- SafetyTask : priorité plus haute, surveille batterie + heap, feed watchdog indépendamment ---
 void safetyTaskFn(void* /*pvParameters*/) {
     WatchdogService::registerCurrentTask();
-
     for (;;) {
         float voltage = battery.readVoltage();
         BatteryLevel lvl = battery.level();
@@ -70,7 +68,25 @@ void safetyTaskFn(void* /*pvParameters*/) {
         }
 
         WatchdogService::feed();
-        vTaskDelay(pdMS_TO_TICKS(500)); // fréquence de surveillance : 2x/seconde
+        vTaskDelay(pdMS_TO_TICKS(500));
+    }
+}
+
+// --- IoTTask : Core 0, priorité basse, isolée du Core moteur/sécurité ---
+void iotTaskFn(void* /*pvParameters*/) {
+    WatchdogService::registerCurrentTask();
+    wifiManager.begin();
+    mqttClient->begin();
+
+    for (;;) {
+        wifiManager.loop();
+
+        if (wifiManager.state() == WiFiConnectionState::Connected) {
+            mqttClient->loop();
+        }
+
+        WatchdogService::feed();
+        vTaskDelay(pdMS_TO_TICKS(200));
     }
 }
 
@@ -79,21 +95,25 @@ void setup() {
     delay(1000);
 
     DiagnosticsService::begin();
+    DeviceIdentity::begin();
     battery.begin();
 
-    bool ok = robot.begin(RobotMode::Mock); // repasse en Hardware quand le banc est prêt
+    g_statusTopic = "trinova/robot/" + DeviceIdentity::deviceId() + "/status";
+    mqttClient = new MqttClient(IoTConfig::MQTT_BROKER_HOST, IoTConfig::MQTT_BROKER_PORT,
+                                 DeviceIdentity::deviceId().c_str());
+    mqttClient->setStatusTopic(g_statusTopic.c_str());
+
+    bool ok = robot.begin(RobotMode::Mock);
     Serial.printf("[Setup] begin() = %s\n", ok ? "OK" : "FAIL");
 
     g_robotMutex = xSemaphoreCreateMutex();
-
     WatchdogService::begin(WATCHDOG_TIMEOUT_S);
 
-    // Core 1 = temps réel moteur/sécurité (recommandé sur ESP32 : Core 0 réservé au Wi-Fi/BT en interne)
     xTaskCreatePinnedToCore(motionTaskFn, "MotionTask", 4096, nullptr, 2, nullptr, 1);
-    xTaskCreatePinnedToCore(safetyTaskFn, "SafetyTask", 4096, nullptr, 3, nullptr, 1); // priorité > MotionTask
+    xTaskCreatePinnedToCore(safetyTaskFn, "SafetyTask", 4096, nullptr, 3, nullptr, 1);
+    xTaskCreatePinnedToCore(iotTaskFn,    "IoTTask",    8192, nullptr, 1, nullptr, 0); // Core 0
 }
 
 void loop() {
-    // Rien ici : tout tourne dans les tâches FreeRTOS dédiées.
     vTaskDelay(pdMS_TO_TICKS(1000));
 }
