@@ -11,13 +11,9 @@ static void staticMqttCallback(char* topic, uint8_t* payload, unsigned int lengt
 MqttClient::MqttClient(const char* host, uint16_t port, const char* clientId)
     : _mqtt(_wifiClient), _host(host), _port(port), _clientId(clientId) {}
 
-void MqttClient::setStatusTopic(const char* topic) {
-    _statusTopic = topic;
-}
-
-void MqttClient::setOnMessage(MessageCallback cb) {
-    g_userCallback = cb;
-}
+void MqttClient::setStatusTopic(const char* topic) { _statusTopic = topic; }
+void MqttClient::setOnMessage(MessageCallback cb)   { g_userCallback = cb; }
+void MqttClient::setOnConnected(ConnectedCallback cb) { _onConnected = cb; }
 
 void MqttClient::begin() {
     _mqtt.setServer(_host, _port);
@@ -27,19 +23,14 @@ void MqttClient::begin() {
 void MqttClient::attemptConnect(uint32_t nowMs) {
     Logger::log(LogLevel::Info, "MQTT", "Tentative de connexion...");
 
-    bool ok;
-    if (_statusTopic) {
-        // Last Will : si le robot se déconnecte brutalement, le broker publie "offline" à sa place.
-        ok = _mqtt.connect(_clientId, _statusTopic, 1, true, "offline");
-    } else {
-        ok = _mqtt.connect(_clientId);
-    }
+    bool ok = _statusTopic
+        ? _mqtt.connect(_clientId, _statusTopic, 1, true, "offline")
+        : _mqtt.connect(_clientId);
 
     if (ok) {
         Logger::log(LogLevel::Info, "MQTT", "Connecte");
-        if (_statusTopic) {
-            publish(_statusTopic, "online", true);
-        }
+        if (_statusTopic) publish(_statusTopic, "online", true);
+        if (_onConnected) _onConnected(); 
         _backoffMs = 1000;
     } else {
         Logger::log(LogLevel::Warn, "MQTT", "Echec connexion");
@@ -51,17 +42,13 @@ void MqttClient::attemptConnect(uint32_t nowMs) {
 void MqttClient::loop() {
     if (!_mqtt.connected()) {
         uint32_t now = millis();
-        if (now - _lastAttemptMs >= _backoffMs) {
-            attemptConnect(now);
-        }
+        if (now - _lastAttemptMs >= _backoffMs) attemptConnect(now);
         return;
     }
     _mqtt.loop();
 }
 
-bool MqttClient::isConnected() {
-    return _mqtt.connected();
-}
+bool MqttClient::isConnected() { return _mqtt.connected(); }
 
 bool MqttClient::publish(const char* topic, const char* payload, bool retained) {
     if (!_mqtt.connected()) return false;
