@@ -44,7 +44,7 @@ robot.backward(40);
 robot.turnLeft(40);
 robot.turnRight(40);
 robot.stop();
-robot.moveServo(0, 90, 500);
+robot.moveServo(0, 90);
 robot.emergencyStop();
 robot.clearEmergencyStop();
 ```

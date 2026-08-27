@@ -25,7 +25,7 @@ Racine : `trinova/robot/{deviceId}/`
 ```
 
 **Sécurité** : `speed` et `angle` sont toujours reclampés côté firmware par `MotionSafety`
-(0-100 pour la vitesse, bornes par canal pour l'angle), quelle que soit la valeur envoyée
+(0-100 pour la vitesse, bornes globales pour l'angle), quelle que soit la valeur envoyée
 sur MQTT. Aucune commande réseau ne peut contourner ces limites.
 
 ## Exemple de payload télémétrie
