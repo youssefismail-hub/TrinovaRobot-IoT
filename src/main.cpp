@@ -14,6 +14,8 @@
 #include "Topics.h"
 #include "IoTConfig.h"
 #include "Logger.h"
+#include "TimeService.h"
+#include "MqttCertificates.h"
 
 constexpr uint8_t  BATTERY_ADC_PIN     = 1;
 constexpr float    BATTERY_DIVIDER     = 2.0f;
@@ -154,9 +156,26 @@ void setup() {
 
     Logger::log(LogLevel::Info, "Firmware", OtaManager::currentVersion());
 
+   
+    WiFi.begin(IoTConfig::WIFI_SSID, IoTConfig::WIFI_PASSWORD);
+    uint32_t wifiStart = millis();
+    while (WiFi.status() != WL_CONNECTED && millis() - wifiStart < 15000) delay(200);
+    if (WiFi.status() == WL_CONNECTED) {
+        TimeService::syncNow();
+    }
+
     mqttClient = new MqttClient(IoTConfig::MQTT_BROKER_HOST, IoTConfig::MQTT_BROKER_PORT,
-                                 DeviceIdentity::deviceId().c_str());
+                                 DeviceIdentity::deviceId().c_str(), MQTT_ROOT_CA); // NOUVEAU: rootCA
     mqttClient->setStatusTopic(g_statusTopic.c_str());
+
+    commandProcessor = new CommandProcessor(robot, g_robotMutex, IoTConfig::COMMAND_HMAC_SECRET); // NOUVEAU
+    
+
+
+
+
+    
+    
 
     bool ok = robot.begin(RobotMode::Mock);
     Serial.printf("[Setup] begin() = %s\n", ok ? "OK" : "FAIL");
