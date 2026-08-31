@@ -1,6 +1,6 @@
 #pragma once
 #include <PubSubClient.h>
-#include <WiFiClient.h>
+#include <WiFiClientSecure.h>
 #include <functional>
 
 class MqttClient {
@@ -8,11 +8,11 @@ public:
     using MessageCallback = std::function<void(const char* topic, const uint8_t* payload, unsigned int length)>;
     using ConnectedCallback = std::function<void()>;
 
-    MqttClient(const char* host, uint16_t port, const char* clientId);
+    MqttClient(const char* host, uint16_t port, const char* clientId, const char* rootCA);
 
     void setStatusTopic(const char* topic);
     void setOnMessage(MessageCallback cb);
-    void setOnConnected(ConnectedCallback cb); //  appelé après chaque (re)connexion réussie
+    void setOnConnected(ConnectedCallback cb);
     void begin();
     void loop();
     bool isConnected();
@@ -22,7 +22,7 @@ public:
 private:
     void attemptConnect(uint32_t nowMs);
 
-    WiFiClient   _wifiClient;
+    WiFiClientSecure _wifiClient; 
     PubSubClient _mqtt;
     const char*  _host;
     uint16_t     _port;
