@@ -168,20 +168,12 @@ void setup() {
                                  DeviceIdentity::deviceId().c_str(), MQTT_ROOT_CA); // NOUVEAU: rootCA
     mqttClient->setStatusTopic(g_statusTopic.c_str());
 
-    commandProcessor = new CommandProcessor(robot, g_robotMutex, IoTConfig::COMMAND_HMAC_SECRET); // NOUVEAU
-    
-
-
-
-
-    
-    
-
+    commandProcessor = new CommandProcessor(robot, g_robotMutex, IoTConfig::COMMAND_HMAC_SECRET); 
     bool ok = robot.begin(RobotMode::Mock);
     Serial.printf("[Setup] begin() = %s\n", ok ? "OK" : "FAIL");
 
     g_robotMutex = xSemaphoreCreateMutex();
-    commandProcessor   = new CommandProcessor(robot, g_robotMutex);
+    commandProcessor   = new CommandProcessor(robot, g_robotMutex, IoTConfig::COMMAND_HMAC_SECRET);
     telemetryPublisher = new TelemetryPublisher(robot, g_robotMutex, *mqttClient, battery, g_telemetryTopic);
 
     WatchdogService::begin(WATCHDOG_TIMEOUT_S);
