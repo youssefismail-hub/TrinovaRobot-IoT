@@ -1,6 +1,9 @@
 # TrinovaRobot-IoT
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![C++](https://img.shields.io/badge/C++-17-00599C?logo=cplusplus)](https://en.cppreference.com/)
+[![ESP32](https://img.shields.io/badge/ESP32-S3-000000?logo=espressif)](https://www.espressif.com/)
+[![IoT](https://img.shields.io/badge/IoT-MQTT-36C5F0?logo=mqtt)](https://mqtt.org/)
 
 Firmware robotique edge IoT pour ESP32-S3 — moteurs DC, servomoteurs PCA9685,
 sécurité temps réel, connectivité MQTT, OTA.
